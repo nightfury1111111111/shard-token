@@ -1,6 +1,6 @@
 use crate::contract::{execute, instantiate, query};
 use crate::error::ContractError;
-use anchor_token::airdrop::{
+use shard_token::airdrop::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
     MerkleRootResponse, QueryMsg,
 };
@@ -14,7 +14,7 @@ fn proper_initialization() {
 
     let msg = InstantiateMsg {
         owner: "owner0000".to_string(),
-        anchor_token: "anchor0000".to_string(),
+        shard_token: "shard0000".to_string(),
     };
 
     let info = mock_info("addr0000", &[]);
@@ -26,7 +26,7 @@ fn proper_initialization() {
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config: ConfigResponse = from_binary(&res).unwrap();
     assert_eq!("owner0000", config.owner.as_str());
-    assert_eq!("anchor0000", config.anchor_token.as_str());
+    assert_eq!("shard0000", config.shard_token.as_str());
 
     let res = query(deps.as_ref(), mock_env(), QueryMsg::LatestStage {}).unwrap();
     let latest_stage: LatestStageResponse = from_binary(&res).unwrap();
@@ -39,7 +39,7 @@ fn update_config() {
 
     let msg = InstantiateMsg {
         owner: "owner0000".to_string(),
-        anchor_token: "anchor0000".to_string(),
+        shard_token: "shard0000".to_string(),
     };
 
     let info = mock_info("addr0000", &[]);
@@ -76,7 +76,7 @@ fn register_merkle_root() {
 
     let msg = InstantiateMsg {
         owner: "owner0000".to_string(),
-        anchor_token: "anchor0000".to_string(),
+        shard_token: "shard0000".to_string(),
     };
 
     let info = mock_info("addr0000", &[]);
@@ -126,7 +126,7 @@ fn claim() {
 
     let msg = InstantiateMsg {
         owner: "owner0000".to_string(),
-        anchor_token: "anchor0000".to_string(),
+        shard_token: "shard0000".to_string(),
     };
 
     let info = mock_info("addr0000", &[]);
@@ -161,7 +161,7 @@ fn claim() {
     assert_eq!(
         res.messages,
         vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "anchor0000".to_string(),
+            contract_addr: "shard0000".to_string(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8".to_string(),
                 amount: Uint128::new(1000001u128),
@@ -221,7 +221,7 @@ fn claim() {
     assert_eq!(
         res.messages,
         vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "anchor0000".to_string(),
+            contract_addr: "shard0000".to_string(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8".to_string(),
                 amount: Uint128::new(2000001u128),

@@ -7,7 +7,7 @@ use crate::state::{
     store_latest_stage, store_merkle_root, Config,
 };
 
-use anchor_token::airdrop::{
+use shard_token::airdrop::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
     MerkleRootResponse, MigrateMsg, QueryMsg,
 };
@@ -30,7 +30,7 @@ pub fn instantiate(
         deps.storage,
         &Config {
             owner: deps.api.addr_canonicalize(&msg.owner)?,
-            anchor_token: deps.api.addr_canonicalize(&msg.anchor_token)?,
+            shard_token: deps.api.addr_canonicalize(&msg.shard_token)?,
         },
     )?;
 
@@ -161,7 +161,7 @@ pub fn claim(
 
     Ok(Response::new()
         .add_messages(vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: deps.api.addr_humanize(&config.anchor_token)?.to_string(),
+            contract_addr: deps.api.addr_humanize(&config.shard_token)?.to_string(),
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.to_string(),
@@ -205,7 +205,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
         owner: deps.api.addr_humanize(&state.owner)?.to_string(),
-        anchor_token: deps.api.addr_humanize(&state.anchor_token)?.to_string(),
+        shard_token: deps.api.addr_humanize(&state.shard_token)?.to_string(),
     };
 
     Ok(resp)

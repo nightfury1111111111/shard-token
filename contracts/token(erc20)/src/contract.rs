@@ -164,3 +164,80 @@ fn try_approve(
         .add_attribute("owner", info.sender)
         .add_attribute("spender", spender))
 }
+
+/// Burn tokens
+///
+/// Remove `amount` tokens from the system irreversibly, from signer account
+///
+/// @param amount the amount of money to burn
+fn try_burn(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    amount: &Uint128,
+) -> Result<Response, ContractError> {
+    let amount_raw = amount.u128();
+
+    let mut account_balance = read_balance(deps.storage, &info.sender)?;
+
+    if account_balance < amount_raw {
+        return Err(ContractError::InsufficientFunds {
+            balance: account_balance,
+            required: amount_raw,
+        });
+    }
+    account_balance -= amount_raw;
+
+    let mut balances_store = PrefixedStorage::new(deps.storage, PREFIX_BALANCES);
+    balances_store.set(
+        info.sender.as_str().as_bytes(),
+        &account_balance.to_be_bytes(),
+    );
+
+    let mut config_store = PrefixedStorage::new(deps.storage, PREFIX_CONFIG);
+    let data = config_store
+        .get(KEY_TOTAL_SUPPLY)
+        .expect("no total supply data stored");
+    let mut total_supply = bytes_to_u128(&data).unwrap();
+
+    total_supply -= amount_raw;
+
+    config_store.set(KEY_TOTAL_SUPPLY, &total_supply.to_be_bytes());
+
+    Ok(Response::new()
+        .add_attribute("action", "burn")
+        .add_attribute("account", info.sender)
+        .add_attribute("amount", amount.to_string()))
+}
+
+fn perform_transfer(
+    store: &mut dyn Storage,
+    from: &Addr,
+    to: &Addr,
+    amount: u128,
+) -> Result<(), ContractError> {
+    let mut balances_store = PrefixedStorage::new(store, PREFIX_BALANCES);
+
+    let mut from_balance = match balances_store.get(from.as_str().as_bytes()) {
+        Some(data) => bytes_to_u128(&data),
+        None => Ok(0u128),
+    }?;
+
+    if from_balance < amount {
+        return Err(ContractError::InsufficientFunds {
+            balance: from_balance,
+            required: amount,
+        });
+    }
+    from_balance -= amount;
+    balances_store.set(from.as_str().as_bytes(), &from_balance.to_be_bytes());
+
+    let mut to_balance = match balances_store.get(to.as_str().as_bytes()) {
+        Some(data) => bytes_to_u128(&data),
+        None => Ok(0u128),
+    }?;
+    to_balance += amount;
+    balances_store.set(to.as_str().as_bytes(), &to_balance.to_be_bytes());
+
+    Ok(())
+}

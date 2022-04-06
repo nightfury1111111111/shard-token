@@ -241,3 +241,37 @@ fn perform_transfer(
 
     Ok(())
 }
+
+// Converts 16 bytes value into u128
+// Errors if data found that is not 16 bytes
+pub fn bytes_to_u128(data: &[u8]) -> Result<u128, ContractError> {
+    match data[0..16].try_into() {
+        Ok(bytes) => Ok(u128::from_be_bytes(bytes)),
+        Err(_) => Err(ContractError::CorruptedDataFound {}),
+    }
+}
+
+// Reads 16 byte storage value into u128
+// Returns zero if key does not exist. Errors if data found that is not 16 bytes
+pub fn read_u128(store: &ReadonlyPrefixedStorage, key: &Addr) -> Result<u128, ContractError> {
+    let result = store.get(key.as_str().as_bytes());
+    match result {
+        Some(data) => bytes_to_u128(&data),
+        None => Ok(0u128),
+    }
+}
+
+fn read_balance(store: &dyn Storage, owner: &Addr) -> Result<u128, ContractError> {
+    let balance_store = ReadonlyPrefixedStorage::new(store, PREFIX_BALANCES);
+    read_u128(&balance_store, owner)
+}
+
+fn read_allowance(
+    store: &dyn Storage,
+    owner: &Addr,
+    spender: &Addr,
+) -> Result<u128, ContractError> {
+    let owner_store =
+        ReadonlyPrefixedStorage::multilevel(store, &[PREFIX_ALLOWANCES, owner.as_str().as_bytes()]);
+    read_u128(&owner_store, spender)
+}

@@ -275,3 +275,37 @@ fn read_allowance(
         ReadonlyPrefixedStorage::multilevel(store, &[PREFIX_ALLOWANCES, owner.as_str().as_bytes()]);
     read_u128(&owner_store, spender)
 }
+
+#[allow(clippy::unnecessary_wraps)]
+fn write_allowance(
+    store: &mut dyn Storage,
+    owner: &Addr,
+    spender: &Addr,
+    amount: u128,
+) -> StdResult<()> {
+    let mut owner_store =
+        PrefixedStorage::multilevel(store, &[PREFIX_ALLOWANCES, owner.as_str().as_bytes()]);
+    owner_store.set(spender.as_str().as_bytes(), &amount.to_be_bytes());
+    Ok(())
+}
+
+fn is_valid_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    if bytes.len() < 3 || bytes.len() > 30 {
+        return false;
+    }
+    true
+}
+
+fn is_valid_symbol(symbol: &str) -> bool {
+    let bytes = symbol.as_bytes();
+    if bytes.len() < 3 || bytes.len() > 6 {
+        return false;
+    }
+    for byte in bytes.iter() {
+        if *byte < 65 || *byte > 90 {
+            return false;
+        }
+    }
+    true
+}

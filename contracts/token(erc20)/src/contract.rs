@@ -354,4 +354,528 @@ mod tests {
         );
         return read_u128(&owner_storage, spender).unwrap();
     }
+
+    mod instantiate {
+        use super::*;
+        use crate::error::ContractError;
+
+        #[test]
+        fn works() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [InitialBalance {
+                    address: "addr0000".to_string(),
+                    amount: Uint128::from(4000u128),
+                }]
+                .to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(
+                get_constants(&deps.storage),
+                Constants {
+                    name: "Cash Token".to_string(),
+                    symbol: "CASH".to_string(),
+                    decimals: 9
+                }
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                4000
+            );
+            assert_eq!(get_total_supply(&deps.storage), 4000);
+        }
+
+        #[test]
+        fn works_with_empty_balance() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(get_total_supply(&deps.storage), 0);
+        }
+
+        #[test]
+        fn works_with_multiple_balances() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [
+                    InitialBalance {
+                        address: "addr0000".to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: "addr1111".to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                    InitialBalance {
+                        address: "addrbbbb".to_string(),
+                        amount: Uint128::from(33u128),
+                    },
+                ]
+                .to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+        }
+
+        #[test]
+        fn works_with_balance_larger_than_53_bit() {
+            let mut deps = mock_dependencies(&[]);
+            // This value cannot be represented precisely in JavaScript and jq. Both
+            //   node -e "console.attr(9007199254740993)"
+            //   echo '{ "value": 9007199254740993 }' | jq
+            // return 9007199254740992
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [InitialBalance {
+                    address: "addr0000".to_string(),
+                    amount: Uint128::from(9007199254740993u128),
+                }]
+                .to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                9007199254740993
+            );
+            assert_eq!(get_total_supply(&deps.storage), 9007199254740993);
+        }
+
+        #[test]
+        // Typical supply like 100 million tokens with 18 decimals exceeds the 64 bit range
+        fn works_with_balance_larger_than_64_bit() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [InitialBalance {
+                    address: "addr0000".to_string(),
+                    amount: Uint128::from(100000000000000000000000000u128),
+                }]
+                .to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                100000000000000000000000000
+            );
+            assert_eq!(get_total_supply(&deps.storage), 100000000000000000000000000);
+        }
+
+        #[test]
+        fn fails_for_large_decimals() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 42,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::DecimalsExceeded {}) => println!("Decimals Exceed Error"),
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_for_name_too_short() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "CC".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::NameWrongFormat {}) => println!("Name Wrong Format"),
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_for_name_too_long() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash coin. Cash coin. Cash coin. Cash coin.".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::NameWrongFormat {}) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_for_symbol_too_short() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "De De".to_string(),
+                symbol: "DD".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::TickerWrongSymbolFormat {}) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_for_symbol_too_long() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Super Coin".to_string(),
+                symbol: "SUPERCOIN".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::TickerWrongSymbolFormat {}) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_for_symbol_lowercase() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CaSH".to_string(),
+                decimals: 9,
+                initial_balances: [].to_vec(),
+            };
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let result = instantiate(deps.as_mut(), env, info, instantiate_msg);
+            match result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::TickerWrongSymbolFormat {}) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+    }
+
+    mod transfer {
+        use super::*;
+        use crate::error::ContractError;
+        use cosmwasm_std::attr;
+
+        fn make_instantiate_msg() -> InstantiateMsg {
+            InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![
+                    InitialBalance {
+                        address: "addr0000".to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: "addr1111".to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                    InitialBalance {
+                        address: "addrbbbb".to_string(),
+                        amount: Uint128::from(33u128),
+                    },
+                ],
+            }
+        }
+
+        #[test]
+        fn can_send_to_existing_recipient() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+            // Transfer
+            let transfer_msg = ExecuteMsg::Transfer {
+                recipient: "addr1111".to_string(),
+                amount: Uint128::from(1u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, transfer_msg).unwrap();
+            assert_eq!(transfer_result.messages.len(), 0);
+            assert_eq!(
+                transfer_result.attributes,
+                vec![
+                    attr("action", "transfer"),
+                    attr("sender", "addr0000"),
+                    attr("recipient", "addr1111"),
+                ]
+            );
+            // New state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                10
+            ); // -1
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                23
+            ); // +1
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+        }
+
+        #[test]
+        fn can_send_to_non_existent_recipient() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+            // Transfer
+            let transfer_msg = ExecuteMsg::Transfer {
+                recipient: "addr2323".to_string(),
+                amount: Uint128::from(1u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, transfer_msg).unwrap();
+            assert_eq!(transfer_result.messages.len(), 0);
+            assert_eq!(
+                transfer_result.attributes,
+                vec![
+                    attr("action", "transfer"),
+                    attr("sender", "addr0000"),
+                    attr("recipient", "addr2323"),
+                ]
+            );
+            // New state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                10
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr2323".to_string())),
+                1
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+        }
+
+        #[test]
+        fn can_send_zero_amount() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+            // Transfer
+            let transfer_msg = ExecuteMsg::Transfer {
+                recipient: "addr1111".to_string(),
+                amount: Uint128::from(0u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, transfer_msg).unwrap();
+            assert_eq!(transfer_result.messages.len(), 0);
+            assert_eq!(
+                transfer_result.attributes,
+                vec![
+                    attr("action", "transfer"),
+                    attr("sender", "addr0000"),
+                    attr("recipient", "addr1111"),
+                ]
+            );
+            // New state (unchanged)
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+        }
+
+        #[test]
+        fn can_send_to_sender() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let sender = "addr0000";
+            // Initial state
+            assert_eq!(get_balance(&deps.storage, &Addr::unchecked(sender)), 11);
+            // Transfer
+            let transfer_msg = ExecuteMsg::Transfer {
+                recipient: sender.to_string(),
+                amount: Uint128::from(3u128),
+            };
+            let (env, info) = mock_env_height(&sender, 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, transfer_msg).unwrap();
+            assert_eq!(transfer_result.messages.len(), 0);
+            assert_eq!(
+                transfer_result.attributes,
+                vec![
+                    attr("action", "transfer"),
+                    attr("sender", "addr0000"),
+                    attr("recipient", "addr0000"),
+                ]
+            );
+            // New state
+            assert_eq!(get_balance(&deps.storage, &Addr::unchecked(sender)), 11);
+        }
+
+        #[test]
+        fn fails_on_insufficient_balance() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+            // Transfer
+            let transfer_msg = ExecuteMsg::Transfer {
+                recipient: "addr1111".to_string(),
+                amount: Uint128::from(12u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, transfer_msg);
+            match transfer_result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::InsufficientFunds {
+                    balance: 11,
+                    required: 12,
+                }) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+            // New state (unchanged)
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addrbbbb".to_string())),
+                33
+            );
+            assert_eq!(get_total_supply(&deps.storage), 66);
+        }
+    }
 }

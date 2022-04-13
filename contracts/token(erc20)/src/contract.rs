@@ -988,4 +988,195 @@ mod tests {
             assert_eq!(get_allowance(&deps.storage, &owner, &spender), 777888);
         }
     }
+
+    mod transfer_from {
+        use super::*;
+        use crate::error::ContractError;
+        use cosmwasm_std::{attr, Addr};
+
+        fn make_instantiate_msg() -> InstantiateMsg {
+            InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![
+                    InitialBalance {
+                        address: "addr0000".to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: "addr1111".to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                    InitialBalance {
+                        address: "addrbbbb".to_string(),
+                        amount: Uint128::from(33u128),
+                    },
+                ],
+            }
+        }
+
+        fn make_spender() -> Addr {
+            Addr::unchecked("dadadadadadadada".to_string())
+        }
+
+        #[test]
+        fn works() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let owner = "addr0000";
+            let spender = make_spender();
+            let recipient = Addr::unchecked("addr1212".to_string());
+            // Set approval
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string().to_string(),
+                amount: Uint128::from(4u128),
+            };
+            let (env, info) = mock_env_height(&owner.clone(), 450, 550);
+            let approve_result = execute(deps.as_mut(), env, info, approve_msg).unwrap();
+            assert_eq!(approve_result.messages.len(), 0);
+            assert_eq!(
+                approve_result.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked(owner.clone())),
+                11
+            );
+            assert_eq!(
+                get_allowance(&deps.storage, &Addr::unchecked(owner.clone()), &spender),
+                4
+            );
+            // Transfer less than allowance but more than balance
+            let transfer_from_msg = ExecuteMsg::TransferFrom {
+                owner: owner.clone().to_string().to_string(),
+                recipient: recipient.clone().to_string(),
+                amount: Uint128::from(3u128),
+            };
+            let (env, info) = mock_env_height(&spender.as_str(), 450, 550);
+            let transfer_from_result =
+                execute(deps.as_mut(), env, info, transfer_from_msg).unwrap();
+            assert_eq!(transfer_from_result.messages.len(), 0);
+            assert_eq!(
+                transfer_from_result.attributes,
+                vec![
+                    attr("action", "transfer_from"),
+                    attr("spender", spender.clone()),
+                    attr("sender", owner),
+                    attr("recipient", recipient),
+                ]
+            );
+            // State changed
+            assert_eq!(get_balance(&deps.storage, &Addr::unchecked(owner)), 8);
+            assert_eq!(
+                get_allowance(&deps.storage, &Addr::unchecked(owner), &spender),
+                1
+            );
+        }
+
+        #[test]
+        fn fails_when_allowance_too_low() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let owner = "addr0000";
+            let spender = make_spender();
+            let recipient = Addr::unchecked("addr1212".to_string());
+            // Set approval
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string(),
+                amount: Uint128::from(2u128),
+            };
+            let (env, info) = mock_env_height(&owner.clone(), 450, 550);
+            let approve_result = execute(deps.as_mut(), env, info, approve_msg).unwrap();
+            assert_eq!(approve_result.messages.len(), 0);
+            assert_eq!(
+                approve_result.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            assert_eq!(get_balance(&deps.storage, &Addr::unchecked(owner)), 11);
+            assert_eq!(
+                get_allowance(&deps.storage, &Addr::unchecked(owner), &spender),
+                2
+            );
+            // Transfer less than allowance but more than balance
+            let fransfer_from_msg = ExecuteMsg::TransferFrom {
+                owner: owner.clone().to_string(),
+                recipient: recipient.clone().to_string(),
+                amount: Uint128::from(3u128),
+            };
+            let (env, info) = mock_env_height(&spender.as_str(), 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, fransfer_from_msg);
+            match transfer_result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::InsufficientAllowance {
+                    allowance: 2,
+                    required: 3,
+                }) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn fails_when_allowance_is_set_but_balance_too_low() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let owner = "addr0000";
+            let spender = make_spender();
+            let recipient = Addr::unchecked("addr1212".to_string());
+            // Set approval
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string(),
+                amount: Uint128::from(20u128),
+            };
+            let (env, info) = mock_env_height(&owner.clone(), 450, 550);
+            let approve_result = execute(deps.as_mut(), env, info, approve_msg).unwrap();
+            assert_eq!(approve_result.messages.len(), 0);
+            assert_eq!(
+                approve_result.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            assert_eq!(get_balance(&deps.storage, &Addr::unchecked(owner)), 11);
+            assert_eq!(
+                get_allowance(&deps.storage, &Addr::unchecked(owner), &spender),
+                20
+            );
+            // Transfer less than allowance but more than balance
+            let fransfer_from_msg = ExecuteMsg::TransferFrom {
+                owner: owner.clone().to_string(),
+                recipient: recipient.clone().to_string(),
+                amount: Uint128::from(15u128),
+            };
+            let (env, info) = mock_env_height(&spender.as_str(), 450, 550);
+            let transfer_result = execute(deps.as_mut(), env, info, fransfer_from_msg);
+            match transfer_result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::InsufficientFunds {
+                    balance: 11,
+                    required: 15,
+                }) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+    }
 }

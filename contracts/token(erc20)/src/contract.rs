@@ -878,4 +878,114 @@ mod tests {
             assert_eq!(get_total_supply(&deps.storage), 66);
         }
     }
+
+    mod approve {
+        use super::*;
+        use cosmwasm_std::attr;
+
+        fn make_instantiate_msg() -> InstantiateMsg {
+            InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![
+                    InitialBalance {
+                        address: "addr0000".to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: "addr1111".to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                    InitialBalance {
+                        address: "addrbbbb".to_string(),
+                        amount: Uint128::from(33u128),
+                    },
+                ],
+            }
+        }
+
+        fn make_spender() -> Addr {
+            Addr::unchecked("dadadadadadadada".to_string())
+        }
+
+        #[test]
+        fn has_zero_allowance_by_default() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Existing owner
+            assert_eq!(
+                get_allowance(&deps.storage, &Addr::unchecked("addr0000"), &make_spender()),
+                0
+            );
+            // Non-existing owner
+            assert_eq!(
+                get_allowance(
+                    &deps.storage,
+                    &Addr::unchecked("addr4567".to_string()),
+                    &make_spender()
+                ),
+                0
+            );
+        }
+
+        #[test]
+        fn can_set_allowance() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            assert_eq!(
+                get_allowance(
+                    &deps.storage,
+                    &Addr::unchecked("addr7654".to_string()),
+                    &make_spender()
+                ),
+                0
+            );
+            // First approval
+            let owner = Addr::unchecked("addr7654".to_string());
+            let spender = make_spender();
+            let approve_msg1 = ExecuteMsg::Approve {
+                spender: spender.clone().to_string().to_string(),
+                amount: Uint128::from(334422u128),
+            };
+            let (env, info) = mock_env_height(&owner.as_str(), 450, 550);
+            let approve_result1 = execute(deps.as_mut(), env, info, approve_msg1).unwrap();
+            assert_eq!(approve_result1.messages.len(), 0);
+            assert_eq!(
+                approve_result1.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            assert_eq!(
+                get_allowance(&deps.storage, &owner, &make_spender()),
+                334422
+            );
+            // Updated approval
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string().to_string(),
+                amount: Uint128::from(777888u128),
+            };
+            let (env, info) = mock_env_height(&owner.as_str(), 450, 550);
+            let approve_result2 = execute(deps.as_mut(), env, info, approve_msg).unwrap();
+            assert_eq!(approve_result2.messages.len(), 0);
+            assert_eq!(
+                approve_result2.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.as_str()),
+                    attr("spender", spender.as_str()),
+                ]
+            );
+            assert_eq!(get_allowance(&deps.storage, &owner, &spender), 777888);
+        }
+    }
 }

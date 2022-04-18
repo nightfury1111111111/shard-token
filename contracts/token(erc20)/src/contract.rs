@@ -1179,4 +1179,159 @@ mod tests {
             }
         }
     }
+
+    mod burn {
+        use super::*;
+        use crate::error::ContractError;
+        use cosmwasm_std::{attr, Addr};
+
+        fn make_instantiate_msg() -> InstantiateMsg {
+            InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![
+                    InitialBalance {
+                        address: "addr0000".to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: "addr1111".to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                ],
+            }
+        }
+
+        #[test]
+        fn can_burn_from_existing_account() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 33);
+            // Burn
+            let burn_msg = ExecuteMsg::Burn {
+                amount: Uint128::from(1u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let burn_result = execute(deps.as_mut(), env, info, burn_msg).unwrap();
+            assert_eq!(burn_result.messages.len(), 0);
+            assert_eq!(
+                burn_result.attributes,
+                vec![
+                    attr("action", "burn"),
+                    attr("account", "addr0000"),
+                    attr("amount", "1")
+                ]
+            );
+            // New state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                10
+            ); // -1
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 32);
+        }
+
+        #[test]
+        fn can_burn_zero_amount() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 33);
+            // Burn
+            let burn_msg = ExecuteMsg::Burn {
+                amount: Uint128::from(0u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let burn_result = execute(deps.as_mut(), env, info, burn_msg).unwrap();
+            assert_eq!(burn_result.messages.len(), 0);
+            assert_eq!(
+                burn_result.attributes,
+                vec![
+                    attr("action", "burn"),
+                    attr("account", "addr0000"),
+                    attr("amount", "0"),
+                ]
+            );
+            // New state (unchanged)
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 33);
+        }
+
+        #[test]
+        fn fails_on_insufficient_balance() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height("creator", 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            // Initial state
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 33);
+            // Burn
+            let burn_msg = ExecuteMsg::Burn {
+                amount: Uint128::from(12u128),
+            };
+            let (env, info) = mock_env_height("addr0000", 450, 550);
+            let burn_result = execute(deps.as_mut(), env, info, burn_msg);
+            match burn_result {
+                Ok(_) => panic!("expected error"),
+                Err(ContractError::InsufficientFunds {
+                    balance: 11,
+                    required: 12,
+                }) => {}
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+            // New state (unchanged)
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr0000".to_string())),
+                11
+            );
+            assert_eq!(
+                get_balance(&deps.storage, &Addr::unchecked("addr1111".to_string())),
+                22
+            );
+            assert_eq!(get_total_supply(&deps.storage), 33);
+        }
+    }
 }

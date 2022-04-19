@@ -314,7 +314,7 @@ fn is_valid_symbol(symbol: &str) -> bool {
 mod tests {
     use super::*;
     use crate::msg::InitialBalance;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Addr, Env, MessageInfo, Storage, Timestamp, Uint128};
     use cosmwasm_storage::ReadonlyPrefixedStorage;
 
@@ -361,7 +361,7 @@ mod tests {
 
         #[test]
         fn works() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -392,7 +392,7 @@ mod tests {
 
         #[test]
         fn works_with_empty_balance() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -407,7 +407,7 @@ mod tests {
 
         #[test]
         fn works_with_multiple_balances() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -448,7 +448,7 @@ mod tests {
 
         #[test]
         fn works_with_balance_larger_than_53_bit() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             // This value cannot be represented precisely in JavaScript and jq. Both
             //   node -e "console.attr(9007199254740993)"
             //   echo '{ "value": 9007199254740993 }' | jq
@@ -476,7 +476,7 @@ mod tests {
         #[test]
         // Typical supply like 100 million tokens with 18 decimals exceeds the 64 bit range
         fn works_with_balance_larger_than_64_bit() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -499,7 +499,7 @@ mod tests {
 
         #[test]
         fn fails_for_large_decimals() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -517,7 +517,7 @@ mod tests {
 
         #[test]
         fn fails_for_name_too_short() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "CC".to_string(),
                 symbol: "CASH".to_string(),
@@ -535,7 +535,7 @@ mod tests {
 
         #[test]
         fn fails_for_name_too_long() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash coin. Cash coin. Cash coin. Cash coin.".to_string(),
                 symbol: "CASH".to_string(),
@@ -553,7 +553,7 @@ mod tests {
 
         #[test]
         fn fails_for_symbol_too_short() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "De De".to_string(),
                 symbol: "DD".to_string(),
@@ -571,7 +571,7 @@ mod tests {
 
         #[test]
         fn fails_for_symbol_too_long() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Super Coin".to_string(),
                 symbol: "SUPERCOIN".to_string(),
@@ -589,7 +589,7 @@ mod tests {
 
         #[test]
         fn fails_for_symbol_lowercase() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CaSH".to_string(),
@@ -635,7 +635,7 @@ mod tests {
 
         #[test]
         fn can_send_to_existing_recipient() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -688,7 +688,7 @@ mod tests {
 
         #[test]
         fn can_send_to_non_existent_recipient() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -745,7 +745,7 @@ mod tests {
 
         #[test]
         fn can_send_zero_amount() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -798,7 +798,7 @@ mod tests {
 
         #[test]
         fn can_send_to_sender() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -828,7 +828,7 @@ mod tests {
 
         #[test]
         fn fails_on_insufficient_balance() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -911,7 +911,7 @@ mod tests {
 
         #[test]
         fn has_zero_allowance_by_default() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -934,7 +934,7 @@ mod tests {
 
         #[test]
         fn can_set_allowance() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1022,7 +1022,7 @@ mod tests {
 
         #[test]
         fn works() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1083,7 +1083,7 @@ mod tests {
 
         #[test]
         fn fails_when_allowance_too_low() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1132,7 +1132,7 @@ mod tests {
 
         #[test]
         fn fails_when_allowance_is_set_but_balance_too_low() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1205,7 +1205,7 @@ mod tests {
 
         #[test]
         fn can_burn_from_existing_account() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1249,7 +1249,7 @@ mod tests {
 
         #[test]
         fn can_burn_zero_amount() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1293,7 +1293,7 @@ mod tests {
 
         #[test]
         fn fails_on_insufficient_balance() {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies_with_balance(&[]);
             let instantiate_msg = make_instantiate_msg();
             let (env, info) = mock_env_height("creator", 450, 550);
             let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -1332,6 +1332,145 @@ mod tests {
                 22
             );
             assert_eq!(get_total_supply(&deps.storage), 33);
+        }
+    }
+
+    mod query {
+        use super::*;
+        use cosmwasm_std::{attr, Addr};
+
+        fn address(index: u8) -> Addr {
+            match index {
+                0 => Addr::unchecked("addr0000".to_string()), // contract instantiateializer
+                1 => Addr::unchecked("addr1111".to_string()),
+                2 => Addr::unchecked("addr4321".to_string()),
+                3 => Addr::unchecked("addr5432".to_string()),
+                4 => Addr::unchecked("addr6543".to_string()),
+                _ => panic!("Unsupported address index"),
+            }
+        }
+
+        fn make_instantiate_msg() -> InstantiateMsg {
+            InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![
+                    InitialBalance {
+                        address: address(1).to_string(),
+                        amount: Uint128::from(11u128),
+                    },
+                    InitialBalance {
+                        address: address(2).to_string(),
+                        amount: Uint128::from(22u128),
+                    },
+                    InitialBalance {
+                        address: address(3).to_string(),
+                        amount: Uint128::from(33u128),
+                    },
+                ],
+            }
+        }
+
+        #[test]
+        fn can_query_balance_of_existing_address() {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height(&address(0).as_str(), 450, 550);
+            let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let query_msg = QueryMsg::Balance {
+                address: address(1).to_string(),
+            };
+            let query_result = query(deps.as_ref(), env, query_msg).unwrap();
+            assert_eq!(query_result.as_slice(), b"{\"balance\":\"11\"}");
+        }
+
+        #[test]
+        fn can_query_balance_of_nonexisting_address() {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height(&address(0).as_str(), 450, 550);
+            let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let query_msg = QueryMsg::Balance {
+                address: address(4).to_string(), // only indices 1, 2, 3 are instantiateialized
+            };
+            let query_result = query(deps.as_ref(), env, query_msg).unwrap();
+            assert_eq!(query_result.as_slice(), b"{\"balance\":\"0\"}");
+        }
+
+        #[test]
+        fn can_query_allowance_of_existing_addresses() {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height(&address(0).as_str(), 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let owner = address(2);
+            let spender = address(1);
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string(),
+                amount: Uint128::from(42u128),
+            };
+            let (env, info) = mock_env_height(&owner.as_str(), 450, 550);
+            let action_result = execute(deps.as_mut(), env.clone(), info, approve_msg).unwrap();
+            assert_eq!(action_result.messages.len(), 0);
+            assert_eq!(
+                action_result.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            let query_msg = QueryMsg::Allowance {
+                owner: owner.clone().to_string(),
+                spender: spender.clone().to_string(),
+            };
+            let query_result = query(deps.as_ref(), env.clone(), query_msg).unwrap();
+            assert_eq!(query_result.as_slice(), b"{\"allowance\":\"42\"}");
+        }
+
+        #[test]
+        fn can_query_allowance_of_nonexisting_owner() {
+            let mut deps = mock_dependencies_with_balance(&[]);
+            let instantiate_msg = make_instantiate_msg();
+            let (env, info) = mock_env_height(&address(0).as_str(), 450, 550);
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
+            let owner = address(2);
+            let spender = address(1);
+            let bob = address(3);
+            let approve_msg = ExecuteMsg::Approve {
+                spender: spender.clone().to_string(),
+                amount: Uint128::from(42u128),
+            };
+            let (env, info) = mock_env_height(&owner.as_str(), 450, 550);
+            let approve_result = execute(deps.as_mut(), env.clone(), info, approve_msg).unwrap();
+            assert_eq!(approve_result.messages.len(), 0);
+            assert_eq!(
+                approve_result.attributes,
+                vec![
+                    attr("action", "approve"),
+                    attr("owner", owner.clone().to_string()),
+                    attr("spender", spender.clone().to_string()),
+                ]
+            );
+            // different spender
+            let query_msg = QueryMsg::Allowance {
+                owner: owner.clone().to_string(),
+                spender: bob.clone().to_string(),
+            };
+            let query_result = query(deps.as_ref(), env.clone(), query_msg).unwrap();
+            assert_eq!(query_result.as_slice(), b"{\"allowance\":\"0\"}");
+            // differnet owner
+            let query_msg = QueryMsg::Allowance {
+                owner: bob.clone().to_string(),
+                spender: spender.clone().to_string(),
+            };
+            let query_result = query(deps.as_ref(), env.clone(), query_msg).unwrap();
+            assert_eq!(query_result.as_slice(), b"{\"allowance\":\"0\"}");
         }
     }
 }
